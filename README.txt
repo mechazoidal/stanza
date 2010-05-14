@@ -26,7 +26,7 @@ A FFI Ruby binding for the Verse protocol library.
 
 (The MIT License)
 
-Copyright (c) 2010 FIX
+Copyright (c) 2010 Scott Francis (scott@kurokoproject.com)
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the

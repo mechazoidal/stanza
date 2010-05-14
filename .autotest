@@ -1,22 +1,23 @@
 # -*- ruby -*-
 
 require 'autotest/restart'
+require 'autotest/growl'
 
-# Autotest.add_hook :initialize do |at|
+Autotest.add_hook :initialize do |at|
 #   at.extra_files << "../some/external/dependency.rb"
 #
 #   at.libs << ":../some/external"
 #
 #   at.add_exception 'vendor'
 #
-#   at.add_mapping(/dependency.rb/) do |f, _|
-#     at.files_matching(/test_.*rb$/)
-#   end
+  at.add_mapping(/dependency.rb/) do |f, _|
+    at.files_matching(/test_.*rb$/)
+  end
 #
 #   %w(TestA TestB).each do |klass|
 #     at.extra_class_map[klass] = "test/test_misc.rb"
 #   end
-# end
+end
 
 # Autotest.add_hook :run_command do |at|
 #   system "rake build"

@@ -1,0 +1,2 @@
+Couplet will hopefully be a pure Ruby Verse implementation.
+It'll probably require EventMachine, and a good deal of elbow grease.

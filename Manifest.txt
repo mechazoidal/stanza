@@ -5,4 +5,4 @@ README.txt
 Rakefile
 lib/stanza.rb
 test/test_helper.rb
-test/test_stanza.rb
+test/stanza_test.rb
