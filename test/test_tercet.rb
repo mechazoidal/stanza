@@ -57,16 +57,10 @@ class TercetTest < Test::Unit::TestCase
         assert(Stanza::Tercet::Verse.method_defined?(s), "Stanza::Tercet::Verse should define method #{s}")
       end
     end
-
     
-    # should have methods:
-    # verse_send_connect_accept
-    # verse_send_node_create
-    # verse_send_connect
-    # verse_callback_update
-    should 'exist' do
-      # pass?
-      
+    should 'define VERSION' do
+      assert_match(/\A\d\.\d\z/, Stanza::Tercet.VERSION)
     end
+    
   end
 end
