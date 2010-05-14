@@ -3,7 +3,6 @@ require 'ffi'
 module Stanza
   module Tercet
     
-    # http://wiki.github.com/ffi/ffi/
     module Verse
 
       extend FFI::Library
@@ -29,15 +28,20 @@ module Stanza
       V_RELEASE_LABEL = ''
       
       # FIXME: what is Eskil calculating?
+      # Hmm. This might be just for the C lib's use(albeit hacky), and not visible to anything else?
       # V_REAL64_MAX = 1.7976931348623158e+308
       # V_REAL32_MAX = 3.402823466e+38f
       #define V_HOST_ID_SIZE	(3 * (512 / 8))		/* The size of host IDs (keys), in 8-bit bytes. */
       
+      FFI.add_typedef(:uint32, :VNodeID)
+      FFI.add_typedef(:uint16, :VLayerID) # verse.h: "Commonly used to identify layers, nodes that have them."
+      FFI.add_typedef(:uint16, :VBufferID) # verse.h: "Commonly used to identify buffers, nodes that have them."
+      FFI.add_typedef(:uint16, :VNMFragmentID)
       
-      # typedef uint32    VNodeID;
-      # typedef uint16    VLayerID;   /* Commonly used to identify layers, nodes that have them. */
-      # typedef uint16    VBufferID;    /* Commonly used to identify buffers, nodes that have them. */
-      # typedef uint16    VNMFragmentID;
+      # VSession is defined in verse.h as typedef void *, which according to:
+      # http://bytes.com/groups/c/567535-cast-function-pointer-void
+      # is probably shorthand for a regular object pointer.
+      FFI.add_typedef(:pointer, :VSession)
 
       VNodeType = enum(
         :V_NT_OBJECT, 0,
@@ -106,8 +110,8 @@ module Stanza
                :vreal64_vec, [:double, 4],  
                :vreal64_mat, [:double, 16], 
                :vstring, :pointer,    
-               :vnode, :uint32, #VNodeID
-               :vlayer, :uint16 #VLayerID
+               :vnode, :VNodeID,
+               :vlayer, :VLayerID
       end 
       VN_TAG_MAX_BLOB_SIZE = 500
       
@@ -133,7 +137,7 @@ module Stanza
       # TODO: any way to do nested structs so that we don't have to define these here?
       module NTag
         class Animation < FFI::Struct
-          layout :curve, :uint32, #VNodeID
+          layout :curve, :VNodeID,
                  :start, :uint32,
                  :end,   :uint32
         end
@@ -149,7 +153,7 @@ module Stanza
                :vreal64, :double,
                :vstring, :pointer,
                :vreal64_vec3, [:double, 3],
-               :vlink, :uint32, #VNodeID
+               :vlink, :VNodeID,
                :vanimation, NTag::Animation,
                :vblob, NTag::Blob
       end
@@ -187,8 +191,8 @@ module Stanza
         :VN_O_METHOD_NAME_SIZE, 16,
         :VN_O_METHOD_SIG_SIZE, 256
       )
-      
-      # typedef void VNOPackedParams;	/* Opaque type. */
+            
+      FFI.add_typedef(:void, :VNOPackedParams) # verse.h: "Opaque type."
       
       # FIXME: look up what C says if the enum count starts over if you define one in the middle
       VNGLayerType = enum(
@@ -290,39 +294,39 @@ module Stanza
                  :layer_b, [:char, 16]
         end
         class Texture < FFI::Struct
-          layout :bitmap, :uint32, #VNodeID
+          layout :bitmap, :VNodeID,
                  :layer_r, [:char, 16],
                  :layer_g, [:char, 16],
                  :layer_b, [:char, 16],
                  :filtered, :bool,
-                 :mapping, :uint16 #VNMFragmentID
+                 :mapping, :VNMFragmentID
         end
         class Noise < FFI::Struct
           layout :type, :uint8,
-                 :mapping, :uint16 #VNMFragmentID
+                 :mapping, :VNMFragmentID
         end
         class Blender < FFI::Struct
           layout :type, :uint8,
-                 :data_a, :uint16, #VNMFragmentID
-                 :data_b, :uint16, #VNMFragmentID
-                 :control, :uint16 #VNMFragmentID
+                 :data_a, :VNMFragmentID,
+                 :data_b, :VNMFragmentID,
+                 :control, :VNMFragmentID
         end
         class Clamp < FFI::Struct
           layout :min, :bool,
                  :red, :double,
                  :green, :double,
                  :blue, :double,
-                 :data, :uint16 #VNMFragmentID
+                 :data, :VNMFragmentID
         end
         class Matrix < FFI::Struct
           layout :matrix, [:double, 16],
-                 :data, :uint16 #VNMFragmentID
+                 :data, :VNMFragmentID
         end
 
         class Ramp < FFI::Struct
           layout :type, :uint8,
                  :channel, :uint8,
-                 :mapping, :uint16, #VNMFragmentID
+                 :mapping, :VNMFragmentID,
                  :point_count, :uint8,
                  :ramp, [VNMRampPoint, 48]
         end
@@ -330,13 +334,13 @@ module Stanza
           layout :label, [:char, 16]
         end
         class Alternative < FFI::Struct
-          layout :alt_a, :uint16, #VNMFragmentID
-                 :alt_b, :uint16 #VNMFragmentID
+          layout :alt_a, :VNMFragmentID,
+                 :alt_b, :VNMFragmentID
         end
         class Output < FFI::Struct
           layout :label, [:char, 16],
-                 :front, :uint16, #VNMFragmentID
-                 :back, :uint16 #VNMFragmentID
+                 :front, :VNMFragmentID,
+                 :back, :VNMFragmentID
         end
       end
 
@@ -410,6 +414,14 @@ module Stanza
       	       :vreal32,  [:float,  :VN_A_BLOCK_SIZE_REAL32],
       	       :vreal64,  [:double, :VN_A_BLOCK_SIZE_REAL64]
       end
+      
+      # REMINDERS:
+      # :buffer_in – Similar to :pointer, but optimized for Buffers that the function can only read (not write).
+      # :buffer_out – Similar to :pointer, but optimized for Buffers that the function can only write (not read).
+      # :buffer_inout – Similar to :pointer, but may be optimized for Buffers.
+      # be wary of functions returning structs:
+      # http://shrewdraven.org/content/passing-structs-value-ffi-rubyjruby
+      # http://groups.google.com/group/ruby-ffi/browse_thread/thread/ace0b94f7912799f
       
       attach_function :verse_send_node_index_subscribe, [:uint32], :void
       attach_function :verse_send_connect, [:pointer, :pointer, :pointer, :pointer], :pointer # actually returns a VSession
