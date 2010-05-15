@@ -23,15 +23,22 @@ module Stanza
         )
       end
 
+      # Constants
       V_RELEASE_NUMBER = '6'
       V_RELEASE_PATCH = '1'
       V_RELEASE_LABEL = ''
-      
+      V_MAX_NAME_LENGTH_SHORT = 16
+      V_MAX_NAME_LENGTH_LONG = 48
+      V_MAX_NAME_PASS_LENGTH = 128
       # FIXME: what is Eskil calculating?
       # Hmm. This might be just for the C lib's use(albeit hacky), and not visible to anything else?
       # V_REAL64_MAX = 1.7976931348623158e+308
       # V_REAL32_MAX = 3.402823466e+38f
       #define V_HOST_ID_SIZE	(3 * (512 / 8))		/* The size of host IDs (keys), in 8-bit bytes. */
+      VN_TAG_MAX_BLOB_SIZE = 500
+      VN_B_TILE_SIZE = 8
+      
+      
       
       FFI.add_typedef(:uint32, :VNodeID)
       FFI.add_typedef(:uint16, :VLayerID) # verse.h: "Commonly used to identify layers, nodes that have them."
@@ -113,7 +120,6 @@ module Stanza
                :vnode, :VNodeID,
                :vlayer, :VLayerID
       end 
-      VN_TAG_MAX_BLOB_SIZE = 500
       
       VNTagType = enum(
         :VN_TAG_BOOLEAN, 0,
@@ -369,8 +375,6 @@ module Stanza
       	:VN_B_LAYER_REAL64
       )
 
-      VN_B_TILE_SIZE = 8
-
       class VNBTile < FFI::Union 
         layout :vuint1, [:uint8, 8],
                :vuint8, [:uint8, 64],
@@ -415,6 +419,50 @@ module Stanza
       	       :vreal64,  [:double, :VN_A_BLOCK_SIZE_REAL64]
       end
       
+      # === Session / callback helper functions
+      
+      # extern void   verse_set_port(uint16 port);
+      attach_function :verse_set_port, [:uint16], :void
+      # extern void   verse_host_id_create(uint8 *id);
+      attach_function :verse_host_id_create, [:uint8], :void
+      # extern void   verse_host_id_set(uint8 *id);
+      attach_function :verse_host_id_set, [:uint8], :void
+      
+      # FIXME: how should this map to Ruby? Sending Procs?
+      # extern void   verse_callback_set(void *send_func, void *callback, void *user_data);
+      attach_function :verse_callback_set, [:pointer, :pointer, :pointer], :void
+      
+      # extern void		verse_callback_update(uint32 microseconds);
+      attach_function :verse_callback_update, [:uint32], :void
+      
+      # extern void   verse_session_set(VSession session);
+      attach_function :verse_session_set, [:VSession], :void
+      # extern VSession   verse_session_get(void);
+      attach_function :verse_session_get, [:void], :VSession
+      # extern void   verse_session_destroy(VSession session);
+      attach_function :verse_session_destroy, [:VSession], :void
+      # extern size_t verse_session_get_size(void);
+      attach_function :verse_session_get_size, [:void], :size_t
+      # extern VNodeID  verse_session_get_avatar(void);
+      attach_function :verse_session_get_avatar, [:void], :VNodeID
+      # extern void   verse_session_get_time(uint32 *seconds, uint32 *fractions);
+      attach_function :verse_session_get_time, [:pointer, :pointer], :void
+      
+      # Not sure how to indicate that the buffers are meant for the enums, because they're pointers.
+      # or is this setting what's in params, i.e. working on a chunk of memory?
+      
+      # extern VNOPackedParams * verse_method_call_pack(uint32 param_count, const VNOParamType *param_type, const VNOParam *params);
+      attach_function :verse_method_call_pack, [:uint32, :buffer_in, :buffer_in],  :buffer_out
+      # extern boolean  verse_method_call_unpack(const VNOPackedParams *data, uint32 param_count, const VNOParamType *param_type, VNOParam *params);
+      attach_function :verse_method_call_unpack, [:buffer_in, :uint32, :buffer_in, :pointer], :bool
+      
+
+      
+      
+      
+      
+      # === Command sending functions
+      
       # REMINDERS:
       # :buffer_in – Similar to :pointer, but optimized for Buffers that the function can only read (not write).
       # :buffer_out – Similar to :pointer, but optimized for Buffers that the function can only write (not read).
@@ -423,16 +471,23 @@ module Stanza
       # http://shrewdraven.org/content/passing-structs-value-ffi-rubyjruby
       # http://groups.google.com/group/ruby-ffi/browse_thread/thread/ace0b94f7912799f
       
+      # extern VSession verse_send_connect(const char *name, const char *pass, const char *address, const uint8 *expected_host_id);
+      # session = Stanza::Tercet::Verse.verse_send_connect("foo", "bar", "localhost", "3888")
+      attach_function :verse_send_connect, [:buffer_in, :buffer_in, :buffer_in, :buffer_in], :VSession
+      
+      # extern void verse_send_node_index_subscribe(uint32 mask);
       attach_function :verse_send_node_index_subscribe, [:uint32], :void
-      attach_function :verse_send_connect, [:pointer, :pointer, :pointer, :pointer], :pointer # actually returns a VSession
+      
 
-      # extern void		verse_callback_update(uint32 microseconds);
-      attach_function :verse_callback_update, [:uint32], :void
+
+
+      
       # extern VSession verse_send_connect_accept(VNodeID avatar, const char *address, uint8 *host_id);
-      attach_function :verse_send_connect_accept, [:uint32, :pointer, :uint8], :pointer
+      attach_function :verse_send_connect_accept, [:VNodeID, :buffer_in, :pointer], :VSession
+      
       # extern void verse_send_node_create(VNodeID node_id, VNodeType type, VNodeOwner owner);
-      # FIXME: are the ints used just uint8s, or something else?
-      attach_function :verse_send_node_create, [:uint32, :uint8, :uint8], :void
+      # Stanza::Tercet::Verse.verse_send_node_create(1, :V_NT_OBJECT, :VN_OWNER_MINE)
+      attach_function :verse_send_node_create, [:VNodeID, VNodeType, VNodeOwner], :void
     end
     
     def self.VERSION
