@@ -410,17 +410,18 @@ module Stanza
       )
       
       # verse.h: "Audio commands take pointers to blocks of these. They are not packed as unions."
+      # FIXME: could have sworn I could use VNAConstants directly here
       class VNABlock < FFI::Union
-      	layout :vint8,    [:int8,   :VN_A_BLOCK_SIZE_INT8],
-      		     :vint16,   [:int16,  :VN_A_BLOCK_SIZE_INT16],
-      		     :vint24,   [:int32,  :VN_A_BLOCK_SIZE_INT24],
-      		     :vint32,   [:int32,  :VN_A_BLOCK_SIZE_INT32],
-      	       :vreal32,  [:float,  :VN_A_BLOCK_SIZE_REAL32],
-      	       :vreal64,  [:double, :VN_A_BLOCK_SIZE_REAL64]
+      	layout :vint8, [:int8, 1024],
+      	       :vint16,   [:int16, 512],
+      	       :vint24,   [:int32, 384],
+      	       :vint32,   [:int32, 256],
+      	       :vreal32,  [:float, 256],
+      	       :vreal64,  [:double,128]
       end
       
       # === Session / callback helper functions
-      
+      callback :generic_callback, [:pointer], :int 
       # extern void   verse_set_port(uint16 port);
       attach_function :verse_set_port, [:uint16], :void
       # extern void   verse_host_id_create(uint8 *id);
@@ -430,7 +431,7 @@ module Stanza
       
       # FIXME: how should this map to Ruby? Sending Procs?
       # extern void   verse_callback_set(void *send_func, void *callback, void *user_data);
-      attach_function :verse_callback_set, [:pointer, :pointer, :pointer], :void
+      attach_function :verse_callback_set, [:pointer, :generic_callback, :pointer], :void
       
       # extern void		verse_callback_update(uint32 microseconds);
       attach_function :verse_callback_update, [:uint32], :void
@@ -483,11 +484,11 @@ module Stanza
 
       
       # extern VSession verse_send_connect_accept(VNodeID avatar, const char *address, uint8 *host_id);
-      attach_function :verse_send_connect_accept, [:VNodeID, :buffer_in, :pointer], :VSession
+      callback :verse_send_connect_accept, [:VNodeID, :buffer_in, :pointer], :VSession
       
       # extern void verse_send_node_create(VNodeID node_id, VNodeType type, VNodeOwner owner);
       # Stanza::Tercet::Verse.verse_send_node_create(1, :V_NT_OBJECT, :VN_OWNER_MINE)
-      attach_function :verse_send_node_create, [:VNodeID, VNodeType, VNodeOwner], :void
+      callback :verse_send_node_create, [:VNodeID, VNodeType, VNodeOwner], :void
     end
     
     def self.VERSION
